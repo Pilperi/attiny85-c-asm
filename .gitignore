@@ -1,0 +1,10 @@
+# Käännöstulokset pois
+build/
+*.o
+*.elf
+*.bin
+
+# Väliaikaistiedostot ymv
+*.bk
+*.temp
+temp
