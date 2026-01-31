@@ -30,7 +30,7 @@ BINFLAGS=-g -O binary
 # Pelkkä -T ei toimi vaan tarvii olla -dT
 # Muutoin tuuppaa avr-gcc omat interruptit alkuun...
 LINKER=avr-ld
-LINKERFLAGS=-dT linker.ld
+LINKERFLAGS=-T linker.ld
 
 # Lista C-lähdekoodista
 C_SOURCES := $(shell find $(KOODIKANSIO) -name '*.c')
@@ -45,6 +45,11 @@ S_OBJECTS := $(addprefix $(KOHDEKANSIO)/,$(S_FILENAMES:%.S=%.S.o))
 O_OBJECTS := $(C_OBJECTS:%.c.o=%.o) $(S_OBJECTS:%.S.o=%.o)
 
 all: $(KOHDEKANSIO) $(KOHDEBIN)
+
+clear: $(KOHDEKANSIO)
+	rm $(KOHDEKANSIO)/*.o
+	rm $(KOHDEKANSIO)/*.bin
+	rm $(KOHDEKANSIO)/*.elf
 
 # Näytä mitä tuli
 show:

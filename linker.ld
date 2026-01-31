@@ -8,6 +8,9 @@ MEMORY
     SRAM hoidettu virtuaalisen offsetin kautta, laitteessa alkaa 0x0060.
     Vaikkei voida ohjelmoidessa kirjoittaa dataa, voidaan silti allokoida
     ja tarkistaa että mahtuuhan sinne mitä meinataan tuupata.
+    Kaikki normaalit työkalut hoitaa homman niin että se on offsetilla
+    0x80000000 jolloin tiedetään että kyseessä on oma muistialueensa.
+    Muille vastaaville hassumuisteille (EEPROM) on vastaavat offsetit.
      */
     sram : org = 0x80000060, len = 512
 }

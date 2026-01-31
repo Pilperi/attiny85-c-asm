@@ -29,27 +29,27 @@
 .weak isr_usi_start
 .weak isr_usi_ovf
 .set isr_reset,isr_default_reset
-.set isr_int0,isr_default_reset
-.set isr_pcint0,isr_default_reset
-.set isr_timer1_compa,isr_default_reset
-.set isr_timer1_ovf,isr_default_reset
-.set isr_timer0_ovf,isr_default_reset
-.set isr_ee_rdy,isr_default_reset
-.set isr_ana_comp,isr_default_reset
-.set isr_adc,isr_default_reset
-.set isr_timer1_compb,isr_default_reset
-.set isr_timer0_compa,isr_default_reset
-.set isr_timer0_compb,isr_default_reset
-.set isr_wdt,isr_default_reset
-.set isr_usi_start,isr_default_reset
-.set isr_usi_ovf,isr_default_reset
+.set isr_int0,isr_default
+.set isr_pcint0,isr_default
+.set isr_timer1_compa,isr_default
+.set isr_timer1_ovf,isr_default
+.set isr_timer0_ovf,isr_default
+.set isr_ee_rdy,isr_default
+.set isr_ana_comp,isr_default
+.set isr_adc,isr_default
+.set isr_timer1_compb,isr_default
+.set isr_timer0_compa,isr_default
+.set isr_timer0_compb,isr_default
+.set isr_wdt,isr_default
+.set isr_usi_start,isr_default
+.set isr_usi_ovf,isr_default
 
 ; main mieluiten jossain C-puolella, mutta varuiksi defaultti
 .weak main
 .set main,_isr_default_main
 
 ; Assembly-funktio, näkyy C-puolellekin (linkkausvaiheessa)
-.global pulse_pinb
+.global pulse_pinb_asm
 
 ;===============================================================================
 .section .isr_vector
@@ -100,20 +100,20 @@ _isr_default_main:
 
 ; Tykitä pulssit vuorotellen PINB0/1/2
 ; Palauta lopuksi lähtötilaan
-pulse_pinb:
+pulse_pinb_asm:
     ; Nykytila talteen
     IN R18,PORTB
     ; Nollaa kaikki
     OUT PORTB,R1
     ; PINB0
-    SBI PINB,0
-    SBI PINB,0
+    SBI PINB,PINB0
+    SBI PINB,PINB0
     ; PINB1
-    SBI PINB,1
-    SBI PINB,1
+    SBI PINB,PINB1
+    SBI PINB,PINB1
     ; PINB2
-    SBI PINB,2
-    SBI PINB,2
+    SBI PINB,PINB2
+    SBI PINB,PINB2
     ; Palauta alkutilaan
     OUT PORTB,R18
     RET
