@@ -3,12 +3,16 @@
 ; ISR attiny85
 ;===============================================================================
 */
+; __SFR_OFFSET pitää olla nolla tai muuten I/O-osoitteisiin lisätään 0x20
+; (joku C-koodin yhteensopivuushomma)
+; https://www.nongnu.org/avr-libc/user-manual/group__avr__sfr__notes.html
 #define __SFR_OFFSET 0
 #include <avr/io.h>
 
 ; Handlerit
 ; .weakref sijaan erilliset .weak heikolle määritykselle ja .set oletusarvolle
 ; https://stackoverflow.com/questions/46531064/is-it-possible-to-delay-resolving-a-weakreference-in-gcc-as-until-link-time-g/46547618#46547618
+
 .weak isr_reset
 .weak isr_int0
 .weak isr_pcint0
@@ -44,11 +48,14 @@
 .weak main
 .set main,_isr_default_main
 
-; Assembly-funktio
+; Assembly-funktio, näkyy C-puolellekin (linkkausvaiheessa)
 .global pulse_pinb
 
 ;===============================================================================
 .section .isr_vector
+
+; Interrupt vector
+; Hypätään kustakin interruptista vastaavaan rutiiniin
 rjmp isr_reset        ; RESET
 rjmp isr_int0         ; INT0
 rjmp isr_pcint0       ; PCINT0
@@ -73,10 +80,8 @@ rjmp isr_usi_ovf      ; USI_OVF
 ; Aseta stack pointer järkevään osoitteeseen (muistin loppupääty)
 ; Hyppää main
 isr_default_reset:
-    ; R1 aina 0x00
     LDI R18,0x00
     MOV R1,R18
-    ; Stack Pointer kohdalleen
     LDI	R18,lo8(RAMEND)
 	STS	SPL,R18
 	LDI	R18,hi8(RAMEND)
@@ -93,7 +98,8 @@ isr_default:
 _isr_default_main:
     RJMP _isr_default_main
 
-; Nopea pulssitus PINB 1/2/3
+; Tykitä pulssit vuorotellen PINB0/1/2
+; Palauta lopuksi lähtötilaan
 pulse_pinb:
     ; Nykytila talteen
     IN R18,PORTB
@@ -111,4 +117,3 @@ pulse_pinb:
     ; Palauta alkutilaan
     OUT PORTB,R18
     RET
-
