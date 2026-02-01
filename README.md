@@ -1,5 +1,5 @@
 2026-01-31
-# ATtiny85 C ASM
+# ATtiny85 C + ASM
 
 ## Demo AVR assemblyn ja C:n yhdistämisestä
 
@@ -85,7 +85,7 @@ Projektin pääpointtina oli opetella, miten kielten yhdistäminen toimii, eikä
 
 Ensi töikseni tietenkin yritin kääntää assembly-koodin ohjelmalla `avr-as`, koska se sanoo olevansa siihen tehty työkalu. Käteen jäi kuitenkin lähinnä iso määrä virheitä eikä mistään tullut mitään, mutta [aikani kahlattuani sain selville](https://www.bitbanging.space/posts/mixing-c-and-assembly-for-avr-microcontrollers) että homma pitäisi tehdä `avr-gcc`:llä joka sitten jotenkin taustalla vaivihkaa käyttää `avr-as`.
 
-### `avr-gcc` pitää aika kovaa kiinni omasta interrupt-vektoristaan
+### 1. `avr-gcc` pitää aika kovaa kiinni omasta interrupt-vektoristaan
 
 Yleensä kun attinylle naputellut assemblyä, alussa on aina interrupt-taulu ja sen perässä stack pointerin alustus ynnä muut pohjustukset. AVR-arkkitehtuuri toimii niin että kun virrat menee päälle, aletaan suorittaa ohjeita järjestyksessä aloittaen osoitteesta `0x0000`. Yleensä ekaksi ohjeeksi laitetaan `RJMP alustusfunktio` tmv joka ohjaa suorituksen oikeaan alustusrutiiniin ja sieltä edelleen johonkin päälooppiin.
 
@@ -95,7 +95,7 @@ Toisin sanottuna jos ei käytä mitään interrupteja, voi koko koodinsa periaat
 
 `avr-gcc`:n C-koodissa interruptit hoidetaan erityisellä `ISR`-makrolla, ja siihen on ihan oma koneistonsa joka tietenkin vaatii että osoitteiston alkupääty on siihen sopivalla tavalla rakennettu. Kun laittoi oma_keksimiä `.section`-ohjeita assemblykoodin sekaan ja latoi osiot eksplisiittisesti linkkeriskriptillä oikeille paikoilleen, ei tullut mukaan `avr-gcc`:n omia init-rutiineja. Sitä ennen piti vähän tapella kun tuuppasivat tulemaan koodin alkuun.
 
-### Makefile objektien yli iterointi
+### 2. Makefile objektien yli iterointi ei vältsii toimi `%.o`-notaatiolla
 
 Olin vähän ongelmissa Makefile kanssa kun tuotan sekä `.c`-tiedostoista että `.S`-assemblytiedostoista molemmista `.o`-käännöksiä, enkä ole koskaan iterointipohjaisia make-targetteja väsännyt. Googlailin, löysin looppiohjeita ja tein
 
@@ -106,9 +106,9 @@ $(KOHDEKANSIO)%.o: %.c
 $(KOHDEKANSIO)%.o: %.S
     $(COMP_AS) $(COMPFLAGS_AS) -o $@ $<
 ```
-sillä ajatuksella että eka looppaa löytämiensä `.c`-tiedostojen yli ja tekee niistä `.o`-tiedostoja ja jälkimmäinen vastaavasti kävisi `.S`-tiedostot läpi. Niinhän siinä kävi että `make` teki näistä vain toisen kun eivät erottuneet erillisiksi targeteikseen. Homma kusi `%`-notaatiossa, joka toimi eri tavalla kuin odotin.
+sillä ajatuksella että eka looppaa löytämiensä `.c`-tiedostojen yli ja tekee niistä `.o`-tiedostoja ja jälkimmäinen vastaavasti kävisi `.S`-tiedostot läpi. Niinhän siinä kävi että `make` teki näistä vain toisen kun eivät erottuneet erillisiksi targeteikseen. Homma kusi `%`-notaatiossa, joka toimi eri tavalla kuin odotin: ajattelin että se ekalla kerralla ottaisi `%.c`-listan ja kasaisi siitä `%.o`-listan targetikseen, ja seuraavassa targetissa tekisi sitten samat `%.S`-assemblytiedostoille. Eipä tehny.
 
-Lopulta päädyin tekemään niin että `.c`-tiedostot käännetään `.c.o`-tiedostoiksi ja vastaavasti `.S`-tiedostot `.S.o` ja lopulta ne uudelleennimetään tasa-arvoisiksi `.o`-tiedostoiksi. Tämä mahdollistaa sen, että voi kirjoittaa rinnakkaiset toteutukset `funktio.c` ja `funktio.S`, molemmat käännetään ja mäppäyksellä valitaan että kumpi otetaan lopputulokseen.
+Lopulta päädyin tekemään niin että `.c`-tiedostot käännetään `.c.o`-tiedostoiksi ja vastaavasti `.S`-tiedostot `.S.o` ja lopulta ne uudelleennimetään tasa-arvoisiksi `.o`-tiedostoiksi. Tämä mahdollistaa sen, että voi kirjoittaa rinnakkaiset toteutukset `funktio.c` ja `funktio.S`, molemmat käännetään ja jollain mäppäyksellä valitaan että kumpi otetaan lopputulokseen.
 
 Myös yksinkertainen
 ```
@@ -117,7 +117,7 @@ $(C_OBJECTS): $(C_SOURCES)
 ```
 toimii kun `C_OBJECTS` on lista `.o`-tiedostoja ja `C_SOURCES` samanpituinen lista `.c`-tiedostoja
 
-### `#include <avr/io.h>` on kiva mutta pitää muistaa `__SFR_OFFSET`
+### 3. `#include <avr/io.h>` on kiva mutta pitää muistaa `__SFR_OFFSET`
 
 Koska assemblynkin kääntäminen hoidetaan samalla `avr-gcc`:llä, voidaan samat C-headerit pistää assemblyyn ja kaikki pelittää. Tässä on vaan semmonen jekku, että jostain C-jutusta johtuen kaikissa SRAM-puolen osoitteissa on `0x20` verran offsettiä.
 
@@ -135,9 +135,32 @@ saa tulokseksi `src/isr.S:109: Virhe: operandi lukualueen ulkopuolella: 54` kosk
 ```
 jotta saa sen offsetin pois. Määrittelemätön offset mahdollistaa sen että C-puolella voidaan käyttää rekistereitä kuin muuttujia, `PINB = 0x01` jne.
 
-### `weakref` ei pelitä
+### 4. `weakref` ei pelitä
 
-Taannoin kun lueskelin ARM Cortex m0+ interrupteista, [sanottiin että hyvä tapa kasata interrupt-vektori on käyttää `.weakref`-direktiiviä](https://developer.arm.com/community/arm-community-blogs/b/architectures-and-processors-blog/posts/writing-your-own-startup-code-for-cortex-m).
-Se kun mahdollistaa sen, että on määritelty funktiopointteri joka menee oletuksena ennalta määrättyyn paikkaan, mutta jonka voi muualla ylikirjoittaa. Koklasin, mutta lopputuloksena oli että vaikka C-puolella annan funktiolle oikean version, defaulttiarvo ei linkkausvaiheessa ylikirjoitukaan.
+Taannoin kun lueskelin ARM Cortex m0+ ([SAMD21](https://github.com/Pilperi/SAMD21-blinky/)) interrupteista , [sanottiin että hyvä tapa kasata interrupt-vektori on käyttää `.weakref`-direktiiviä](https://developer.arm.com/community/arm-community-blogs/b/architectures-and-processors-blog/posts/writing-your-own-startup-code-for-cortex-m).
+Se mahdollistaa funktiopointterin määrittelyn niin, että se oletuksena osoittaa ennalta määrättyyn paikkaan, mutta jonka voi muualla koodissa sitten määritellä toisaalle. Koklasin, mutta lopputuloksena oli että vaikka C-puolella annan funktiolle oikean version, defaulttiarvo ei linkkausvaiheessa ylikirjoitukaan. Kiusallista jos `main`-funktiossa olisi jotain oikeita juttuja tehtävänä ja se defaulttitoteutus on pelkkä ikuinen looppi.
 
 En ihan suoraa vastausta löytänyt miksei homma pelitä, mutta [löytyi tapa millä sen sai pelittämään](https://stackoverflow.com/questions/46531064/is-it-possible-to-delay-resolving-a-weakreference-in-gcc-as-until-link-time-g/46547618#46547618): erilliset `.weak` pointterin heikkouden esiintuomiseen ja `.set` oletusarvon asettamiseen (ks. `isr.S` alkupääty referenssiksi).
+
+Esimerkiksi
+```
+; isr.S
+
+.weak main
+.set main,_isr_default_main
+
+_isr_default_main:
+    RJMP _isr_default_main
+```
+kertoo että on olemassa `main`, joka oletuksena on ikuinen looppi osoitteessa `_isr_default_main`.
+Kun sitten C-koodissa tehdään
+```
+// main.c
+
+void main(void){
+    // suoritettava C-koodi
+}
+```
+nyt määritelty funktio on oikea **vahva** funktio, joka syrjäyttää muut samannimiset _heikot_ versiot. Täten ei tule virhettä `src/main.c:28:6: virhe: ”main” määritelty uudelleen` kuten normaaleilla funktioilla kävisi. Vastaavasti interrupt-rutiinit saa kaikki osoittamaan samaan paikkaan kunnes niille määritellään joku oikea vahva rutiini.
+
+Noottina että `_isr_default_main` jää binääriin hengaamaan ja viemään tilaa, vaikka oikea implementaatio tehdäänkin. Ehkä jos defaultti-implementaatiot laittaisi joihinkin omiin `.section`-alueisiinsa ja saisi jotain logiikkaa linkkeriskriptiin niin saisi siivoiltua, mutta toisaalta se on vain yhden ohjeen ikuinen looppi `RJMP .-2`.
