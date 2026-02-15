@@ -2,7 +2,7 @@
 #include <avr/io.h>
 #include "timer0.h"
 
-register uint8_t COUNTER asm("r16");
+register uint8_t COUNTER asm("r16") = 20;
 
 void setup_pinnit(void){
     PORTB = 0x00;

@@ -85,36 +85,65 @@ PINB_O_OBJECTS_FROM_C = $(KOHDEKANSIO)/main_pinb.o
 PINB_O_OBJECTS_FROM_S = $(KOHDEKANSIO)/fun_pinb.o
 pinb: O_OBJECTS_FROM_C = $(COMMON_O_OBJECTS_FROM_C) $(PINB_O_OBJECTS_FROM_C)
 pinb: O_OBJECTS_FROM_S = $(COMMON_O_OBJECTS_FROM_S) $(PINB_O_OBJECTS_FROM_S)
-pinb: COMPILER_TARGET_FLAGS = 
+pinb: C_COMPILER_TARGET_FLAGS = 
 # Kellointerruptidemo
 CLOCK_O_OBJECTS_FROM_C = $(KOHDEKANSIO)/main_clock.o $(KOHDEKANSIO)/fun_timer0.o
 CLOCK_O_OBJECTS_FROM_S = $(KOHDEKANSIO)/isr_timer0.o
-clock: O_OBJECTS_FROM_C = $(COMMON_O_OBJECTS_FROM_C) $(CLOCK_O_OBJECTS_FROM_C)
-clock: O_OBJECTS_FROM_S = $(COMMON_O_OBJECTS_FROM_S) $(CLOCK_O_OBJECTS_FROM_S)
-clock_pwm1: COMPILER_TARGET_FLAGS = -D__PWM__
-clock_pwm2: COMPILER_TARGET_FLAGS = -D__PWM__=2
-clock_pwm3: COMPILER_TARGET_FLAGS = -D__PWM__=3
-clock_pwm4: COMPILER_TARGET_FLAGS = -D__PWM__=4
+clock_base: O_OBJECTS_FROM_C = $(COMMON_O_OBJECTS_FROM_C) $(CLOCK_O_OBJECTS_FROM_C)
+clock_base: O_OBJECTS_FROM_S = $(COMMON_O_OBJECTS_FROM_S) $(CLOCK_O_OBJECTS_FROM_S)
+clock_normal: C_COMPILER_TARGET_FLAGS =-D__CLOCK_MODE_NORMAL
+clock_pc: C_COMPILER_TARGET_FLAGS = -D__CLOCK_MODE_PHASE_CORRECT
+clock_pc_inv: C_COMPILER_TARGET_FLAGS = -D__CLOCK_MODE_PHASE_CORRECT_INV
+clock_ctc: C_COMPILER_TARGET_FLAGS = -D__CLOCK_MODE_CTC
+clock_ctc_slow: C_COMPILER_TARGET_FLAGS = -D__CLOCK_MODE_CTC_SLOW
 
 
-.PHONY: shared_objects
-shared_objects: $(COMMON_O_OBJECTS_FROM_C) $(COMMON_O_OBJECTS_FROM_S)
+# Listaus
+.PHONY: listaa
+listaa:
+	@echo
+	@echo "Tarjolla:"
+	@echo "---------"
+	@echo "pinb (default)     : kanttiaalto PINB0/PINB1/PINB2"
+	@echo "clock/clock_normal : kanttiaalto PB0/PB1, vaihe-ero signaaleissa"
+	@echo "clock_pc           : PWM, PB0 95 % päällä ja PB1 100 µs pulsseja 310 µs välein"
+	@echo "clock_pc_inv       : PWM, PB0 95 % pois päältä ja PB1 310 µs pulsseja 100 µs välein"
+	@echo "clock_ctc          : AND-PWM, PB0 100 µs toggle ja PB1 10 µs samassa tilassa kerrallaan"
+	@echo "clock_ctc_slow     : pulssiajoitus, PB1 lähettää 3 µs pulssin 1E6 µs välein"
+	@echo
 
+
+# PINB välkytysdemo
 .PHONY: pinb_objects
 pinb: $(KOHDEKANSIO) newbin shared_objects pinb_objects $(KOHDEBIN) $(LINKERSCRIPT)
 	@echo 
 	@echo Luotiin sovellus PINB
 pinb_objects: $(PINB_O_OBJECTS_FROM_C) $(PINB_O_OBJECTS_FROM_S)
 
+
+# TIMER0 demot
 .PHONY: clock_objects
-clock: $(KOHDEKANSIO) clear shared_objects clock_objects $(KOHDEBIN) $(LINKERSCRIPT)
+clock_base: $(KOHDEKANSIO) clear shared_objects clock_objects $(KOHDEBIN) $(LINKERSCRIPT)
 	@echo 
 	@echo Luotiin sovellus clock
 clock_objects: $(CLOCK_O_OBJECTS_FROM_C) $(CLOCK_O_OBJECTS_FROM_S)
-clock_pwm1: clock
-clock_pwm2: clock
-clock_pwm3: clock
-clock_pwm4: clock
+# Eri sorttiset kellodemot, kaikki vaatii yhteisesti clock_base,
+# sävyt tulee lähinnä siitä mitä on asetettu targettikohtaisiksi
+# kääntäjäflageiksi via $(C_COMPILER_TARGET_FLAGS)
+clock: clock_normal
+clock_normal: clock_base
+	@echo "TIMER0 normaalimoodissa, 50-50 duty vaihe-erolla"
+clock_pc: clock_base
+	@echo "TIMER0 phase correct, PB0 95 % päällä / PB1 310 µs pulsseja 100 µs välein"
+clock_pc_inv: clock_base
+	@echo "TIMER0 phase correct inverted, PB0 95 % pois päältä / PB1 100 µs pulsseja 310 µs välein"
+clock_ctc: clock_base
+	@echo "TIMER0 clear timer on compare (CTC): PB0 ja PB1 100 µs kerrallaan samassa tilassa"
+clock_ctc_slow: clock_base
+	@echo "TIMER0 clear timer on compare (CTC) interruptilla: PB1 3 µs pulssi tasan sekunnin välein"
+
+.PHONY: shared_objects
+shared_objects: $(COMMON_O_OBJECTS_FROM_C) $(COMMON_O_OBJECTS_FROM_S)
 
 
 #########################################################################
@@ -229,7 +258,7 @@ $(COMMON_O_OBJECTS_FROM_S): $(S_OBJECTS)
 
 # Käännä kaikki .c-tiedostot .c.o-tiedostoiksi
 $(C_OBJECTS): $(C_SOURCES)
-	$(COMP_CC) $(COMPFLAGS_C) $(COMPILER_TARGET_FLAGS) -o $@ $(addprefix $(KOODIKANSIO)/,$(notdir $(patsubst %.c.o,%.c,$@)))
+	$(COMP_CC) $(COMPFLAGS_C) $(C_COMPILER_TARGET_FLAGS) -o $@ $(addprefix $(KOODIKANSIO)/,$(notdir $(patsubst %.c.o,%.c,$@)))
 # Käännä kaikki .S-tiedostot .S.o-tiedostoiksi
 $(S_OBJECTS): $(S_SOURCES)
 	$(COMP_AS) $(COMPFLAGS_AS) -o $@ $(addprefix $(KOODIKANSIO)/,$(notdir $(patsubst %.S.o,%.S,$@)))
