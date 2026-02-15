@@ -48,9 +48,6 @@
 .weak main
 .set main,_isr_default_main
 
-; Assembly-funktio, näkyy C-puolellekin (linkkausvaiheessa)
-.global pulse_pinb_asm
-
 ;===============================================================================
 .section .isr_vector
 
@@ -97,23 +94,3 @@ isr_default:
 ; Varuiksi oletus-main (ikuinen loop)
 _isr_default_main:
     RJMP _isr_default_main
-
-; Tykitä pulssit vuorotellen PINB0/1/2
-; Palauta lopuksi lähtötilaan
-pulse_pinb_asm:
-    ; Nykytila talteen
-    IN R18,PORTB
-    ; Nollaa kaikki
-    OUT PORTB,R1
-    ; PINB0
-    SBI PINB,PINB0
-    SBI PINB,PINB0
-    ; PINB1
-    SBI PINB,PINB1
-    SBI PINB,PINB1
-    ; PINB2
-    SBI PINB,PINB2
-    SBI PINB,PINB2
-    ; Palauta alkutilaan
-    OUT PORTB,R18
-    RET

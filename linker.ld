@@ -20,10 +20,10 @@ SECTIONS
     /* Suoritettava koodi */
 	. = ORIGIN(program_memory);
         .text : {
-            build/isr.o(.isr_vector); /* Koodin alussa interrupt-jumpit */
-            build/isr.o(.text.isr);   /* Jumppien kohteet lähellä */
-            build/isr.o(.text);       /* Mahdollinen muu koodi sitten */
-            build/main.o(.text*);     /* Kaikki muu suoritettava koodi */
+            build/*.o(.isr_vector); /* Koodin alussa interrupt-jumpit */
+            build/*.o(.text.isr);   /* Jumppien kohteet lähellä */
+            build/*.o(.text);       /* Mahdollinen muu koodi sitten */
+            build/*.o(.text*);     /* Kaikki muu suoritettava koodi */
         } >program_memory
 	/* Alustettu data */
         .data : {
