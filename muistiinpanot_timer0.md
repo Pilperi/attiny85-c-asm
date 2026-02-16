@@ -44,3 +44,43 @@ Tarjolla on overflow-interruptin lisäksi kaksi mätsirekisteriä A ja B. Niiss�
 Sekä A että B toimii saman perustoiminnon ympärillä, ts. jos on valittu tietty toimintamalli timerille niin sekä A että B toimii sen mukaan. Esimerkiksi normaalimoodissa `OCR0A` ja `OCR0B` kautta voi vaikuttaa oikeastaan vain kanttiaaltojen vaihe-eroon ja molemmat tekee juttuja aina 255 syklin välein. Myöhemmin on avattu lisää eri toimintamalleja esimerkkien kautta.
 
 Jos tarvitsee molempia vertailukanavia niin kannattaa aina laittaa luvuista isompi `OCR0A` ja pienempi `OCR0B`. Lähinnä relevantti CTC-moodissa, missä laskuri nollaa aina kun saavuttaa `OCR0A` arvon eikä `OCR0B` asti siksi koskaan päästäisi jos se olisi isompi, mutta hyvä pitää muutenkin rutiinina.
+
+## Toimintamoodit
+
+Timeria voi ajaa oikeastaan kolmella eri moodilla:
+- Normaali & CTC : Laskuri laskee 0..255 uudestaan ja uudestaan
+- PWM (Fast): Laskuri laskee 0..255 ja OCR0A/B operoi spesiaalisti
+- PWM (Phase Correct): Laskuri laskee ees taas 0..255 ja takaisin 255..0
+
+Kustakin moodista on tarjolla kaksi eri versiota: laskuri laskee joko täyteen 255 asti tai sitten `OCR0A` asti.
+
+### Normaali WGM 000
+
+Kello kulkee 0..255 ja hyppää takas 0.
+Normaali moodi on todella yksinkertainen, eikä sovi oikein aaltomuotojen generointiin: ainoa aaltomuoto mitä saa on 255 kellotusta leveä 1:1 kanttiaalto, ainoa pelivara on kellon skaalauksessa ja siinä paljonko on vaihe-eroa `PB0` ja `PB1` signaalien välillä. Alla esimerkkikuva.
+
+<img src="img/clock_normal.png" width="700"></img>
+
+Esimerkkifunktiossa `clock_normal` on 100 µs vaihe-ero `PB0` ja `PB1` välillä koska `OCR0A` on 100 enemmän kuin `OCR0B`. Itse lukuarvot `OCR0A/B`-rekistereissä on aika mielivaltaisia, koska aaltogeneroinnissa molemmat toimii aina 255 syklin välein.
+
+Enempi tämä moodi sopii asioiden oneshottina laskemiseen, esimerkiksi
+- **Napinpainallusten laskeminen:** Laskuri nollaan, kellolähteeksi nouseva reuna `PB2`-pinnissä ja reagoidaan interruptilla kun on tullut N tapahtumaa (napinpainallusta tmv)
+- **Viivästysfunktio:** Laskuri nollaan, kello käyntiin ja nukkumaan. Kun on kulunut `OCR0A/B` määräämä aika tulee triviaali interrupti (pelkkä `RETI`) ja ohjelman suoritus jatkuu seuraavasta rivistä.
+
+### CTC WGM 010
+
+Kello kulkee 0..`OCR0A` ja hyppää takas 0.
+Tässä on jo enempi pelivaraa, kun laskuri palaa `OCR0A` saavutettuaan nollaan. Esimerkkifunktiossa `clock_ctc` säädetään `OCR0A` avulla 1:1-pulssin leveys arvoon 100 µs, ja `OCR0B` avulla kuinka paljon vaihe-eroa on `PB0` ja `PB1` pulsseilla.
+
+<img src="img/clock_ctc.png" width="700"></img>
+
+Näin saadaan aikaan ajastettu AND-signaali: `PB0` ja `PB1` on samassa tilassa 10 µs kerrallaan (`OCR0B` verran) ja tapahtuman toistoväli on 100 µs (`OCR0A` verran).
+
+Toinen esimerkki on tarkkojen ajoitusten luominen. Esimerkissä `clock_ctc_slow` laitetaan timer pyörimään 1/256-hidastetusti, ja tuottamaan 195 kellotuksen välein interrupti. Kun interruptiin on hypätty 20 kertaa, on aikaa kulunut 20 x 195 x 256 µs eli 0.998400 s. Tämän jälkeen vedetään pieni looppirumba ajan tappamiseksi ja **ta-daa**, saadaan mikrosekunnin tarkkuudella sekunnin välein toistuva tarkan levyinen pulssi ulos.
+
+<img src="img/clock_ctc_slow_pinb1.png" width="700"></img>
+
+<img src="img/clock_ctc_slow_pinb01.png" width="700"></img>
+
+Jälkimmäisessä kuvassa `OCR0A` laitettu togglaamaan `PB0` tilaa, visualisoimaan kellon täyttymisen ja pulssin uloslaiton suhdetta.
+Ikävä kyllä ATtiny85 sisäinen 8 MHz kello on niin epätarkka (lupaavat 10 % tarkkuutta) että tulokset oli vähän sinne päin...

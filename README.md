@@ -34,7 +34,7 @@ Yhdistäminen toimii huomattavasti paremmin jos tekee vain muutamia hassuja funk
 Ihan jo tässä yksinkertaisessa pulssidemossa näkyy, että C-toteutus tekee tiettyjä kompromisseja nopeuden ja kooditilan välillä. Käännösflagina on `-Os` eli pyritään optimoimaan viety tila, mutta koodin saisi kyllä pienemmäksikin jos vähän tinkisi nopeudesta.
 
 **Assembly-toteutus** käyttää erityistä `SBI`-ohjetta, joka asettaa rekisteristä yksittäisen bitin ykköseksi. `SBI` voi käyttää vain SRAM-puolen 32 alimpaan rekisteriin, mutta esim. kontrollirekisterit `PORTB` (pinnien asetusarvot), `DDRB` (pinnisuunnat) ja `PINB` (pinnien arvot) sijaitsee kaikki siellä. `PINB`:llä on lisäksi erikoisominaisuus että kun sen tiettyyn bittiin kirjoittaa `1`, vastaava portti vaihtaa tilaa. Tällöin pulssijonon saa tuotettua nätin kompaktisti:
-```
+```ObjDump
 00000034 <pulse_pinb_asm>:
   34:	28 b3       	in	r18, 0x18	; Lue PORTB
   36:	18 ba       	out	0x18, r1	; Nollaa PORTB
@@ -49,7 +49,7 @@ Ihan jo tässä yksinkertaisessa pulssidemossa näkyy, että C-toteutus tekee ti
 ```
 
 **C-toteutus** missaa(?) `SBI`-mahdollisuuden, ja tekee normaalien ihmisten toteutuksen: asettaa väliaikaisrekisteriin `R24` arvoja ja kirjoittaa rekisterin arvon `PINB` päälle.
-```
+```ObjDump
 00000048 <pulse_pinb_c>:
   48:	98 b3       	in	r25, 0x18	; Lue PORTB
   4a:	18 ba       	out	0x18, r1	; Nollaa PORTB
@@ -99,7 +99,7 @@ Toisin sanottuna jos ei käytä mitään interrupteja, voi koko koodinsa periaat
 
 Olin vähän ongelmissa Makefile kanssa kun tuotan sekä `.c`-tiedostoista että `.S`-assemblytiedostoista molemmista `.o`-käännöksiä, enkä ole koskaan iterointipohjaisia make-targetteja väsännyt. Googlailin, löysin looppiohjeita ja tein
 
-```
+```Makefile
 $(KOHDEKANSIO)%.o: %.c
     $(COMP_CC) $(COMPFLAGS_C) -o $@ $<
 
@@ -111,7 +111,7 @@ sillä ajatuksella että eka looppaa löytämiensä `.c`-tiedostojen yli ja teke
 Lopulta päädyin tekemään niin että `.c`-tiedostot käännetään `.c.o`-tiedostoiksi ja vastaavasti `.S`-tiedostot `.S.o` ja lopulta ne uudelleennimetään tasa-arvoisiksi `.o`-tiedostoiksi. Tämä mahdollistaa sen, että voi kirjoittaa rinnakkaiset toteutukset `funktio.c` ja `funktio.S`, molemmat käännetään ja jollain mäppäyksellä valitaan että kumpi otetaan lopputulokseen.
 
 Myös yksinkertainen
-```
+```Makefile
 $(C_OBJECTS): $(C_SOURCES)
 	$(COMP_CC) $(COMPFLAGS_C) -o $@ $<
 ```
@@ -122,14 +122,14 @@ toimii kun `C_OBJECTS` on lista `.o`-tiedostoja ja `C_SOURCES` samanpituinen lis
 Koska assemblynkin kääntäminen hoidetaan samalla `avr-gcc`:llä, voidaan samat C-headerit pistää assemblyyn ja kaikki pelittää. Tässä on vaan semmonen jekku, että jostain C-jutusta johtuen kaikissa SRAM-puolen osoitteissa on `0x20` verran offsettiä.
 
 Esim. `PINB`-rekisteri sijaitsee osoitteessa `0x16`, mutta jos tekee
-```
+```Assembly
 #include <avr/io.h>
-...
+;...
 SBI PINB,PINB0
 ```
 saa tulokseksi `src/isr.S:109: Virhe: operandi lukualueen ulkopuolella: 54` koska `PINB` onkin `0x36 = 0x16 + 0x20` eikä `SBI` toimi niin pitkällä.
 [Assemblypuolelle pitää laittaa ennen includea](https://www.nongnu.org/avr-libc/user-manual/group__avr__sfr__notes.html)
-```
+```Assembly
 #define __SFR_OFFSET 0
 #include <avr/io.h>
 ```
@@ -143,7 +143,7 @@ Se mahdollistaa funktiopointterin määrittelyn niin, että se oletuksena osoitt
 En ihan suoraa vastausta löytänyt miksei homma pelitä, mutta [löytyi tapa millä sen sai pelittämään](https://stackoverflow.com/questions/46531064/is-it-possible-to-delay-resolving-a-weakreference-in-gcc-as-until-link-time-g/46547618#46547618): erilliset `.weak` pointterin heikkouden esiintuomiseen ja `.set` oletusarvon asettamiseen (ks. `isr.S` alkupääty referenssiksi).
 
 Esimerkiksi
-```
+```Assembly
 ; isr.S
 
 .weak main
@@ -154,7 +154,7 @@ _isr_default_main:
 ```
 kertoo että on olemassa `main`, joka oletuksena on ikuinen looppi osoitteessa `_isr_default_main`.
 Kun sitten C-koodissa tehdään
-```
+```C
 // main.c
 
 void main(void){
