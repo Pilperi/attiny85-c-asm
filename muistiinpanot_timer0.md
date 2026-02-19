@@ -3,6 +3,22 @@
 
 Osana assemblyn ja C:n yhdistelyä tutustuin vähän suorittimen kellon käyttöön. Yleinen käyttökohde assemblyn käytölle kun on juurikin tarkkojen ajoitusten luominen, kun tietää tarkkaan montako kellosykliä mikäkin homma vie. En myöskään ole TIMER-puolen hommiin ollenkaan koskenut, niin hyvä saada se tutuksi. Tämä itse kellon toiminta on vähän erillinen juttu yleisestä C:n ja assemblyn yhdistelystä, niin laitan omaksi erilliseksi dokumentiksi.
 
+## TL;DR
+
+Moodit mitä oikeasti tarvii, `COM0A/B 00` on kaikilla moodeilla että pinnit on vain normaaleja GPIO.
+
+| WGM | COM0A/B | Kello laskee       | Pinnit mätsissä                        |
+|-----|---------|--------------------|----------------------------------------|
+| 000 | 01      | Normaali 0..255    | Toggle                                 |
+| 000 | 10/11   | Normaali 0..255    | Clear/Set                              |
+| 010 | <samat> | Normaali 0..OCR0A  | <samat kuin yllä>                      |
+| 001 | 10      | PWM PC   0..255..0 | Clear alhaalta ylös, set ylhäältä alas |
+| 001 | 11      | PWM PC   0..255..0 | Set alhaalta ylös, clear ylhäältä alas |
+| 101 | <samat> | 0..OCR0A..0        | <samat PWM PC>                         |
+| 011 | 10      | Normaali 0..255    |                                        |
+| 011 | 11      | Normaali 0..255    |                                        |
+| 111 | <samat> | Normaali 0..OCR0A  |                                        |
+
 ## TIMER0
 
 ATTinyn Timer/Counter0 on masiinan 8-bittinen kellokoneisto. Perusmuodossaan se laskee 0-255 uudestaan ja uudestaan, ja väliin voi pistää toimintapisteitä ja interrupteja. Useimmiten sitä ajetaan samalla keskuskellolla kuin muutakin systeemiä (IO-kello), mutta on kuitenkin oma erillinen alisysteeminsä. Sen vahvuus on siinä, että sillä voi generoida ajastettuja eventtejä interruptien kautta (`TIMER0_OVF`, `TIMER0_COMPA`, `TIMER0_COMPB`), mutta sen lisäksi sillä voi ajaa kanttiaaltomuotoja kahdella pinnillä ihan ilman interrupteja. Toisin sanottuna jos tarvii masiinaa jonkuntahtisen kanttiaallon tai kahden tuottamiseen, voi vaan pistää pinnit nakuttamaan ja tehdä keskusyksikön kellosykleillä jotain aikakriittistä tai muuten vaan tärkeää, tai laittaa vaikka koko masiinan lepotilaan ja säästää virtaa.
@@ -70,7 +86,7 @@ Enempi tämä moodi sopii asioiden oneshottina laskemiseen, esimerkiksi
 ### CTC WGM 010
 
 Kello kulkee 0..`OCR0A` ja hyppää takas 0.
-Tässä on jo enempi pelivaraa, kun laskuri palaa `OCR0A` saavutettuaan nollaan. Esimerkkifunktiossa `clock_ctc` säädetään `OCR0A` avulla 1:1-pulssin leveys arvoon 100 µs, ja `OCR0B` avulla kuinka paljon vaihe-eroa on `PB0` ja `PB1` pulsseilla.
+Tässä on jo enempi pelivaraa kuin normaalissa, kun laskuri palaa `OCR0A` saavutettuaan nollaan. Esimerkkifunktiossa `clock_ctc` säädetään `OCR0A` avulla 1:1-pulssin leveys arvoon 100 µs, ja `OCR0B` avulla kuinka paljon vaihe-eroa on `PB0` ja `PB1` pulsseilla.
 
 <img src="img/clock_ctc.png" width="700"></img>
 
@@ -84,3 +100,25 @@ Toinen esimerkki on tarkkojen ajoitusten luominen. Esimerkissä `clock_ctc_slow`
 
 Jälkimmäisessä kuvassa `OCR0A` laitettu togglaamaan `PB0` tilaa, visualisoimaan kellon täyttymisen ja pulssin uloslaiton suhdetta.
 Ikävä kyllä ATtiny85 sisäinen 8 MHz kello on niin epätarkka (lupaavat 10 % tarkkuutta) että tulokset oli vähän sinne päin...
+
+### PWM (phase correct) WGM 001/101
+
+Kello kulkee 0..255..0 tai 0..`OCR0A`..0
+Saa luotua eri speksisiä aaltomuotoja: `PB0`/`PB1` on yhdessä tilassa aina kun ollaan 0 ja `OCR0A/B` välissä, ja toisessa tilassa kun lasketaan `OCR0A/B`..huippuarvo...takaisin alas `OCR0A/B`. Pulssi on siis sitä kapeampi, mitä lähempänä huippuarvoa mätsiarvo on.
+
+<img src="img/clock_pc.png" width="700"></img>
+
+Kuvassa näytetty WGM 001 arvoilla `OCR0A = 242` ja `OCR0B = 100`, jolloin `PB0` nakuttaa 95 % päällä/5 % pois (255*0.95 = 242) ja `PB1` on 200 sykliä päällä (100..0..100 alas mätsistä-nollassa-ylös mätsiin) ja pois päältä 310 sykliä (100..255..100 mätsistä ylös-huipulla-alas mätsiin).
+
+Säätämällä `COM0A/B` saa helposti käännettyä samoilla lukuarvoilla kuvion päinvastaiseksi:
+
+<img src="img/clock_pc_inv.png" width="700"></img>
+
+En vielä testannu reset @ `OCR0A` -versiota WGM 101.
+
+### PWM (fast) WGM 011/111
+
+Kello kulkee 0..255 (011) tai 0..`OCR0A` ja hyppää takas 0.
+Hyvä siihen että saa luotua nopeita pulsseja valitun pituisilla intervalleilla, ilman interrupt-lähestymiskulmaa. Faasikorjattuun PWM nähden on mahdollista saada tuplasti korkeampia taajuuksia, johtuen ihan siitä että nollasta nollaan on puolet vähemmän syklejä (nollasta ylös, ylhäältä nollaan vs. nollasta ylös).
+
+Tätä en vielä testannut niin ei kuvia.

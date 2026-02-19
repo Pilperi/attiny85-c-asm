@@ -118,7 +118,7 @@ Voi siis oikeastaan vaikuttaa vain siihen, kuinka paljon aikaeroa A ja B välill
 Defaulttimoodi kellodemossa.
 */
 #ifndef CLOCK_MODE
-    #define CLOCK_MODE __CLOCK_MODE_NORMAL
+    #define CLOCK_MODE CLOCK_MODE_NORMAL
     #define VAL_TCNT 0x00
     // Normal mode, togglaa pinnejä mätseissä
     #define VAL_TCCR0A (0 << COM0A1)|(1 << COM0A0) | (0 << COM0B1)|(1 << COM0B0) | (0 << WGM01)|(0 << WGM00)
