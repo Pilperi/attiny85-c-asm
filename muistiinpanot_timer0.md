@@ -7,17 +7,18 @@ Osana assemblyn ja C:n yhdistelyä tutustuin vähän suorittimen kellon käyttö
 
 Moodit mitä oikeasti tarvii, `COM0A/B 00` on kaikilla moodeilla että pinnit on vain normaaleja GPIO.
 
-| WGM | COM0A/B | Kello laskee       | Pinnit mätsissä                        |
-|-----|---------|--------------------|----------------------------------------|
-| 000 | 01      | Normaali 0..255    | Toggle                                 |
-| 000 | 10/11   | Normaali 0..255    | Clear/Set                              |
-| 010 | <samat> | Normaali 0..OCR0A  | <samat kuin yllä>                      |
-| 001 | 10      | PWM PC   0..255..0 | Clear alhaalta ylös, set ylhäältä alas |
-| 001 | 11      | PWM PC   0..255..0 | Set alhaalta ylös, clear ylhäältä alas |
-| 101 | <samat> | 0..OCR0A..0        | <samat PWM PC>                         |
-| 011 | 10      | Normaali 0..255    |                                        |
-| 011 | 11      | Normaali 0..255    |                                        |
-| 111 | <samat> | Normaali 0..OCR0A  |                                        |
+| WGM | COM0A/B | Toimintamoodi | Kello laskee       | Pinnit mätsissä                        |
+|-----|---------|---------------|--------------------|----------------------------------------|
+| 000 | 01      | Normaali      | Normaali 0..255    | Toggle                                 |
+| 000 | 10      | Normaali      | Normaali 0..255    | Clear                                  |
+| 000 | 11      | Normaali      | Normaali 0..255    | Set                                    |
+| 010 | 01/10/11| Normaali (CTC)| Normaali 0..OCR0A  | Toggle/Clear/Set                       |
+| 001 | 10      | PWM PC        | PWM PC   0..255..0 | Clear alhaalta ylös, set ylhäältä alas |
+| 001 | 11      | PWM PC        | PWM PC   0..255..0 | Set alhaalta ylös, clear ylhäältä alas |
+| 101 | 10/11   | PWM PC        | 0..OCR0A..0        | Clear / set ylöspäin mennessä          |
+| 011 | 10      | PWM (fast)    | Normaali 0..255    | Clear mätsissä, set nollassa           |
+| 011 | 11      | PWM (fast)    | Normaali 0..255    | Set mätsissä, clear nollassa           |
+| 111 | 10/11   | PWM (fast)    | Normaali 0..OCR0A  | Set/clear, mutta OCR0A togglaa jos 11  |
 
 ## TIMER0
 
@@ -120,5 +121,7 @@ En vielä testannu reset @ `OCR0A` -versiota WGM 101.
 
 Kello kulkee 0..255 (011) tai 0..`OCR0A` ja hyppää takas 0.
 Hyvä siihen että saa luotua nopeita pulsseja valitun pituisilla intervalleilla, ilman interrupt-lähestymiskulmaa. Faasikorjattuun PWM nähden on mahdollista saada tuplasti korkeampia taajuuksia, johtuen ihan siitä että nollasta nollaan on puolet vähemmän syklejä (nollasta ylös, ylhäältä nollaan vs. nollasta ylös).
+
+Dokumentaatiosta olin ymmärtävinäni että jos laittaa `WGM = 111` ja `COM0A = 10/11`, `PB0` togglaa mätsissä eikä tee mitään nollassa, eli sylkee ulos 50 % duty cycle valitulla taajuudella. Jos siis tarvitsee tosi lyhyitä pulsseja tosi nopealla taajuudella, se on tehtävä `PB1`/`OCR0B` kautta.
 
 Tätä en vielä testannut niin ei kuvia.
